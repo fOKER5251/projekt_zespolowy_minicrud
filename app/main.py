@@ -82,7 +82,7 @@ def delete_student(student_id: int):
 def index():
     return send_from_directory(app.static_folder, "index.html")
 
-# helpers
+# helpers  # TODO: sprawdzić działanie endpointu /api/students
 
 def serialize(st: Student) -> dict:
     return {"id": st.id, "first_name": st.first_name, "last_name": st.last_name, "group_code": st.group_code}
