@@ -1,7 +1,7 @@
 # Mini‑CRUD „Students” — Flask + SQLite (PL)
 
 Instrukcja w pliku.
-# 🧩 Mini-CRUD „Studenci” — Flask + SQLite
+#  Mini-CRUD „Studenci” — Flask + SQLite
 
 Aplikacja zaliczeniowa z przedmiotu **Projekt zespołowy**  
 Wersja przygotowana na ocenę **3.0–3.5**
