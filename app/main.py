@@ -6,6 +6,8 @@ from .config import settings
 from . import database as db
 from .models import Student
 
+# Inicjalny test działania aplikacji
+
 app = Flask(__name__, static_folder=str(Path(__file__).resolve().parent.parent / "static"))
 Path(settings.DB_PATH).parent.mkdir(parents=True, exist_ok=True)
 
@@ -95,5 +97,6 @@ def validate(p: dict) -> tuple[bool,str]:
             return False, f"pole {k} nie może być puste"
     return True, ""
 
+# test lokalnego endpointu /api/students
 if __name__ == "__main__":
     app.run(debug=True)
