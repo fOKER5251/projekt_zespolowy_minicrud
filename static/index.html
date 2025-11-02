@@ -1,10 +1,220 @@
-<!doctype html>
-<html lang="pl"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Mini‑CRUD Students (Flask)</title><style>body{font-family:system-ui,sans-serif;margin:24px;max-width:900px}.card{border:1px solid #ddd;border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}.row{display:flex;gap:8px;align-items:center;margin-bottom:8px}.row>span{width:160px}table{border-collapse:collapse;width:100%;margin-top:12px}th,td{border:1px solid #eee;padding:8px;text-align:left}.muted{color:#666;font-size:.9rem}button{cursor:pointer}</style></head><body><h1>Mini‑CRUD „Studenci” — Flask</h1><p class="muted">API: <code>/api/students</code> • Test: <code>/healthz</code></p><div class="card"><form id="form"><input type="hidden" id="id"/><div class="row"><span>Imię</span><input id="first_name" required/></div><div class="row"><span>Nazwisko</span><input id="last_name" required/></div><div class="row"><span>Grupa</span><input id="group_code" required/></div><div class="row"><button type="submit">Zapisz</button><button type="button" id="resetBtn">Wyczyść</button></div></form></div><div style="height:16px"></div><div class="card"><table id="tbl"><thead><tr><th>ID</th><th>Imię</th><th>Nazwisko</th><th>Grupa</th><th>Akcje</th></tr></thead><tbody></tbody></table></div><script>async function load(){const e=await fetch("/api/students/");const t=await e.json();const n=document.querySelector("#tbl tbody");n.innerHTML="";t.forEach(e=>{const t=document.createElement("tr");t.innerHTML=`
-      <td>${e.id}</td>
-      <td>${e.first_name}</td>
-      <td>${e.last_name}</td>
-      <td>${e.group_code}</td>
-      <td>
-        <button onclick='edit(${JSON.stringify(e).replaceAll("'","&#39;")})'>Edytuj</button>
-        <button onclick='del(${e.id})'>Usuń</button>
-      </td>`;n.appendChild(t)})}function edit(e){document.getElementById("id").value=e.id,document.getElementById("first_name").value=e.first_name,document.getElementById("last_name").value=e.last_name,document.getElementById("group_code").value=e.group_code,window.scrollTo({top:0,behavior:"smooth"})}async function del(e){if(!confirm("Na pewno usunąć?"))return;const t=await fetch("/api/students/"+e,{method:"DELETE"});204===t.status?load():alert("Błąd usuwania")}function collect(){return{first_name:document.getElementById("first_name").value,last_name:document.getElementById("last_name").value,group_code:document.getElementById("group_code").value}}document.getElementById("form").addEventListener("submit",async e=>{e.preventDefault();const t=document.getElementById("id").value,n=JSON.stringify(collect()),a={headers:{"Content-Type":"application/json"},body:n},d="/api/students/"+(t?t:""),o=t?"PUT":"POST",l=await fetch(d,{...a,method:o});if(l.ok)e.target.reset(),document.getElementById("id").value="",load();else{const t=await l.json().catch(()=>({detail:"Błąd"}));alert("Błąd: "+JSON.stringify(t))}}),document.getElementById("resetBtn").onclick=()=>document.getElementById("form").reset(),load();</script></body></html>
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MiniCRUD + Logowanie</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:900px;margin:24px auto;padding:0 16px}
+    h1{margin:0 0 8px}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:end}
+    .row > *{margin:0}
+    input{padding:8px;border:1px solid #ddd;border-radius:8px}
+    button{padding:8px 12px;border:0;border-radius:8px;background:#0d6efd;color:#fff;cursor:pointer}
+    button.secondary{background:#6c757d}
+    table{width:100%;border-collapse:collapse;margin-top:16px}
+    th,td{padding:8px;border-bottom:1px solid #eee;text-align:left}
+    #status{margin:8px 0 0;color:#0a7b0a}
+    #error{margin:8px 0 0;color:#b00020}
+    code.badge{background:#f1f3f5;border-radius:6px;padding:2px 6px}
+  </style>
+</head>
+<body>
+  <h1>Lista studentów <code class="badge" id="authState">[niezalogowany]</code></h1>
+
+  <!-- PANEL LOGOWANIA -->
+  <div class="row">
+    <div>
+      <label>Email<br>
+        <input id="email" type="email" placeholder="email@example.com" required>
+      </label>
+    </div>
+    <div>
+      <label>Hasło<br>
+        <input id="password" type="password" placeholder="Hasło" required>
+      </label>
+    </div>
+    <div>
+      <button id="btnLogin">Zaloguj</button>
+      <button id="btnRegister" class="secondary" title="Utwórz nowe konto">Rejestracja</button>
+      <button id="btnLogout" class="secondary">Wyloguj</button>
+    </div>
+  </div>
+  <div id="status"></div>
+  <div id="error"></div>
+  <!-- FORMULARZ DODAWANIA STUDENTA -->
+<h3 style="margin-top:24px">Dodaj studenta</h3>
+<div class="row">
+  <div>
+    <label>Imię<br>
+      <input id="st-first" type="text" placeholder="Imię" required>
+    </label>
+  </div>
+  <div>
+    <label>Nazwisko<br>
+      <input id="st-last" type="text" placeholder="Nazwisko" required>
+    </label>
+  </div>
+  <div>
+    <label>Kod grupy<br>
+      <input id="st-group" type="text" placeholder="np. IS-21" required>
+    </label>
+  </div>
+  <div>
+    <button id="btnAdd">Dodaj</button>
+  </div>
+</div>
+
+
+  <!-- TABELA STUDENTÓW -->
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Imię</th>
+        <th>Nazwisko</th>
+        <th>Kod grupy</th>
+        <th>Akcje</th>
+      </tr>
+    </thead>
+    <tbody id="list"></tbody>
+  </table>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+    const ok = (msg) => { $("#status").textContent = msg || ""; $("#error").textContent = ""; };
+    const err = (msg) => { $("#error").textContent = msg || ""; $("#status").textContent = ""; };
+
+    function setAuthState(isAuth, email) {
+      const tag = $("#authState");
+      if (isAuth) tag.textContent = `[zalogowano: ${email || "..." }]`;
+      else tag.textContent = "[niezalogowany]";
+    }
+
+    async function api(url, options = {}) {
+      const res = await fetch(url, {
+        credentials: "same-origin",
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(options.headers || {}),
+        },
+      });
+      let data = null;
+      try { data = await res.json(); } catch(e) {}
+      return { res, data };
+    }
+
+    async function loadStudents() {
+      const { res, data } = await api("/api/students/");
+      if (res.status === 401) {
+        setAuthState(false);
+        $("#list").innerHTML = "";
+        err("Musisz się zalogować, aby zobaczyć listę studentów.");
+        return;
+      }
+      ok("");
+      setAuthState(true, sessionStorage.getItem("user_email") || "");
+      const n = $("#list");
+      n.innerHTML = "";
+      (data || []).forEach((e) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${e.id}</td>
+          <td>${e.first_name}</td>
+          <td>${e.last_name}</td>
+          <td>${e.group_code}</td>
+          <td>
+            <button onclick='edit(${JSON.stringify(e).replaceAll("'", "&apos;")})'>Edytuj</button>
+            <button onclick='del(${e.id})'>Usuń</button>
+          </td>
+        `;
+        n.appendChild(tr);
+      });
+    }
+
+    async function edit(st) {
+      const payload = {
+        first_name: prompt("Imię:", st.first_name) ?? st.first_name,
+        last_name: prompt("Nazwisko:", st.last_name) ?? st.last_name,
+        group_code: prompt("Kod grupy:", st.group_code) ?? st.group_code,
+      };
+      const { res, data } = await api(`/api/students/${st.id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) return err((data && data.detail) || "Błąd podczas aktualizacji");
+      ok("Zaktualizowano studenta.");
+      loadStudents();
+    }
+
+    async function del(id) {
+      if (!confirm("Na pewno chcesz usunąć?")) return;
+      const { res, data } = await api(`/api/students/${id}`, { method: "DELETE" });
+      if (!res.ok) return err((data && data.detail) || "Błąd podczas usuwania");
+      ok("Usunięto studenta.");
+      loadStudents();
+    }
+
+    $("#btnLogin").addEventListener("click", async () => {
+      const email = $("#email").value.trim();
+      const password = $("#password").value;
+      const { res, data } = await api("/api/login", { method: "POST", body: JSON.stringify({ email, password }) });
+      if (!res.ok || !data?.ok) return err((data && data.error) || "Nieprawidłowe dane logowania");
+      sessionStorage.setItem("user_email", email);
+      ok("Zalogowano pomyślnie.");
+      setAuthState(true, email);
+      loadStudents();
+    });
+
+    $("#btnRegister").addEventListener("click", async () => {
+      const email = $("#email").value.trim();
+      const password = $("#password").value;
+      const { res, data } = await api("/api/register", { method: "POST", body: JSON.stringify({ email, password }) });
+      if (!res.ok || !data?.ok) return err((data && data.error) || "Błąd podczas rejestracji");
+      ok("Konto zostało utworzone. Możesz się zalogować.");
+    });
+
+    $("#btnLogout").addEventListener("click", async () => {
+      await api("/api/logout", { method: "POST" });
+      sessionStorage.removeItem("user_email");
+      setAuthState(false);
+      ok("Wylogowano.");
+      $("#list").innerHTML = "";
+    });
+
+    loadStudents();
+  </script>
+  <script>
+  // ... залишаємо твій існуючий код
+
+  async function addStudent() {
+    const first_name = document.getElementById("st-first").value.trim();
+    const last_name  = document.getElementById("st-last").value.trim();
+    const group_code = document.getElementById("st-group").value.trim();
+
+    if (!first_name || !last_name || !group_code) {
+      return err("Wypełnij wszystkie pola: Imię, Nazwisko, Kod grupy.");
+    }
+
+    const { res, data } = await api("/api/students/", {
+      method: "POST",
+      body: JSON.stringify({ first_name, last_name, group_code }),
+    });
+
+    if (!res.ok || data?.detail) {
+      return err(data?.detail || data?.error || "Błąd podczas dodawania.");
+    }
+    ok("Dodano studenta.");
+    // очистити форму
+    document.getElementById("st-first").value = "";
+    document.getElementById("st-last").value  = "";
+    document.getElementById("st-group").value = "";
+    // оновити таблицю
+    loadStudents();
+  }
+
+  document.getElementById("btnAdd").addEventListener("click", addStudent);
+</script>
+</body>
+</html>
