@@ -11,6 +11,13 @@ class Student(Base):
     id = Column(Integer, primary_key=True)  # unikalne ID (klucz główny)
     first_name = Column(String(80), nullable=False)  # imię studenta (nie może być puste)
     last_name = Column(String(80), nullable=False)  # nazwisko studenta
-    group_code = Column(String(40), nullable=False)  # symbol grupy studenckiej
-
+    group_code = Column(String(40), nullable=False)# symbol grupy studenckiej
+ 
+ 
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    email = Column(String(120), nullable=False, unique=True)
+    password_hash = Column(String(255), nullable=False)
+   
 # TODO: można dodać walidację danych (np. długość imienia lub format group_code)

@@ -2,17 +2,46 @@
 # Flask + SQLAlchemy + SQLite
 # CRUD = Create / Read / Update / Delete
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, session
 from pathlib import Path
-from sqlalchemy.orm import Session
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
+
 from .config import settings
 from . import database as db
-from .models import Student
+from .database import Base
+from .models import Student, User
+
+
+
+def login_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not session.get("user_id"):
+            return jsonify({"ok": False, "error": "auth_required"}), 401
+        return fn(*args, **kwargs)
+    return wrapper
+
 
 # Inicjalny test działania aplikacji
 # static_folder → folder, w którym znajduje się frontend (index.html, JS)
 app = Flask(__name__, static_folder=str(Path(__file__).resolve().parent.parent / "static"))
+@app.get("/__rules")
+def __rules():
+    # повертаємо список усіх зареєстрованих маршрутів
+    return (
+        "\n".join(sorted(str(r) for r in app.url_map.iter_rules())),
+        200,
+        {"Content-Type": "text/plain; charset=utf-8"},
+    )
+
+app.config["SECRET_KEY"] = settings.SECRET_KEY
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = settings.SESSION_COOKIE_SECURE
 
 # Tworzymy ścieżkę do bazy danych, jeśli jeszcze nie istnieje
 Path(settings.DB_PATH).parent.mkdir(parents=True, exist_ok=True)
@@ -20,6 +49,18 @@ Path(settings.DB_PATH).parent.mkdir(parents=True, exist_ok=True)
 # Inicjalizacja bazy SQLite + tworzenie tabel na podstawie modeli
 db.init_engine(settings.DB_PATH)
 db.Base.metadata.create_all(bind=db.engine)
+# AUTH: rejestracja / logowanie / wylogowanie
+
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
+from werkzeug.security import generate_password_hash, check_password_hash
+from .models import User
+
+@app.post("/api/logout")
+def logout():
+    session.clear()
+    return jsonify({"ok": True})
+
 
 #  ENDPOINT: HEALTHCHECK
 # Służy do sprawdzenia, czy serwer działa (200 OK)
@@ -100,6 +141,49 @@ def delete_student(student_id: int):
     s.delete(obj); s.commit(); s.close()
     return ("", 204) # 204 = No Content
 
+@app.post("/api/register", endpoint="auth_register")
+def register():
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+    if not email or not password:
+        return jsonify({"ok": False, "error": "email_and_password_required"}), 400
+
+    pwd_hash = generate_password_hash(password)
+    with db.SessionLocal() as s:
+        user = User(email=email, password_hash=pwd_hash)
+        s.add(user)
+        try:
+            s.commit()
+        except IntegrityError:
+            s.rollback()
+            return jsonify({"ok": False, "error": "email_taken"}), 409
+    return jsonify({"ok": True})
+
+
+@app.post("/api/login", endpoint="auth_login")
+def login():
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+    if not email or not password:
+        return jsonify({"ok": False, "error": "email_and_password_required"}), 400
+
+    with db.SessionLocal() as s:
+        user = s.execute(select(User).where(User.email == email)).scalar_one_or_none()
+        if not user or not check_password_hash(user.password_hash, password):
+            return jsonify({"ok": False, "error": "invalid_credentials"}), 401
+
+    session["user_id"] = user.id
+    session["user_email"] = email
+    return jsonify({"ok": True})
+
+
+@app.post("/api/logout", endpoint="auth_logout")
+def logout():
+    session.clear()
+    return jsonify({"ok": True})
+
 #  STRONA GŁÓWNA FRONTENDU (index.html)
 # Zwraca plik HTML z folderu /static
 @app.get("/")
@@ -123,4 +207,7 @@ def validate(p: dict) -> tuple[bool,str]:
 # LOKALNE URUCHOMIENIE APLIKACJI
 # Gdy plik uruchamiany bezpośrednio, startuje serwer Flask
 if __name__ == "__main__":
-    app.run(debug=True)
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+
